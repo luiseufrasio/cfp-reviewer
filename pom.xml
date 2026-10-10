@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>fish.payara.demo</groupId>
+    <artifactId>cfp-reviewer</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>war</packaging>
+
+    <name>CFP Reviewer Agent</name>
+    <description>A Jakarta Agentic AI agent that reviews conference talk submissions with a local LLM, running on Payara Micro.</description>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <failOnMissingWebXml>false</failOnMissingWebXml>
+
+        <!-- First Payara Micro release that ships the Jakarta Agentic AI runtime -->
+        <payara.version>7.2026.9</payara.version>
+        <jakarta.agentic-ai-api.version>1.0.0-M1</jakarta.agentic-ai-api.version>
+    </properties>
+
+    <dependencies>
+        <!-- Jakarta Agentic AI API (implemented and provided by Payara) -->
+        <dependency>
+            <groupId>jakarta.agentic-ai</groupId>
+            <artifactId>jakarta.agentic-ai-api</artifactId>
+            <version>${jakarta.agentic-ai-api.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Jakarta EE 10: CDI, REST, JSON-B, Validation -->
+        <dependency>
+            <groupId>jakarta.platform</groupId>
+            <artifactId>jakarta.jakartaee-api</artifactId>
+            <version>10.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>cfp-reviewer</finalName>
+        <plugins>
+            <!-- The Payara Micro plugin does not download the runtime itself:
+                 resolve it into the local repository during the build. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>fetch-payara-micro</id>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>get</goal>
+                        </goals>
+                        <configuration>
+                            <groupId>fish.payara.extras</groupId>
+                            <artifactId>payara-micro</artifactId>
+                            <version>${payara.version}</version>
+                            <transitive>false</transitive>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>fish.payara.maven.plugins</groupId>
+                <artifactId>payara-micro-maven-plugin</artifactId>
+                <version>2.5.1</version>
+                <configuration>
+                    <artifactItem>
+                        <groupId>fish.payara.extras</groupId>
+                        <artifactId>payara-micro</artifactId>
+                        <version>${payara.version}</version>
+                    </artifactItem>
+                    <deployWar>true</deployWar>
+                    <contextRoot>/</contextRoot>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

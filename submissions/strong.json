@@ -1,0 +1,6 @@
+{
+  "title": "Virtual Threads in Jakarta EE 11: What Changes for Your Application Code",
+  "speaker": "Ada Example",
+  "track": "Jakarta EE",
+  "summary": "Jakarta Concurrency 3.1 lets managed executors run tasks on virtual threads. This talk shows, with a live demo on Payara, where virtual threads pay off (blocking JDBC and REST client calls), where they do not (CPU-bound work, pinned monitors), and how to measure the difference with JFR. Attendees leave with a checklist for enabling virtual threads safely in an existing Jakarta EE application."
+}
