@@ -1,10 +1,13 @@
 package fish.payara.demo.cfp;
 
+import jakarta.ai.agent.Action;
 import jakarta.ai.agent.Agent;
 import jakarta.ai.agent.Decision;
 import jakarta.ai.agent.LargeLanguageModel;
 import jakarta.ai.agent.Result;
 import jakarta.ai.agent.Trigger;
+import jakarta.json.bind.Jsonb;
+import jakarta.json.bind.JsonbBuilder;
 
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -20,6 +23,8 @@ public class CfpReviewerAgent {
 
     private static final Logger LOGGER = Logger.getLogger(CfpReviewerAgent.class.getName());
 
+    private static final Jsonb JSONB = JsonbBuilder.create();
+
     private static final String SCOPE_PROMPT = """
             You screen talk submissions for a Java User Group.
             The JUG accepts talks about Java, the JVM, Jakarta EE, MicroProfile \
@@ -27,6 +32,14 @@ public class CfpReviewerAgent {
             Is the following submission in scope?
             Answer YES or NO on the first line, then give the reason in one sentence on the second line.
             Submission: {}
+            """;
+
+    private static final String REVIEW_PROMPT = """
+            Now review that submission as a member of the program committee.
+            Score it from 1 (reject) to 5 (must accept), judging clarity, depth and value for the audience.
+            Be strict: a vague abstract without concrete content scores 1 or 2.
+            Reply with JSON only, no markdown, in exactly this shape:
+            {"score": 3, "strengths": ["..."], "weaknesses": ["..."], "comment": "a short, constructive comment to the speaker"}
             """;
 
     /**
@@ -56,5 +69,28 @@ public class CfpReviewerAgent {
         boolean inScope = verdict.toUpperCase().contains("YES");
         LOGGER.info(() -> "[DECISION] in scope: " + inScope + " - " + reason);
         return new Result(inScope, reason);
+    }
+
+    /**
+     * Writes the review. The LLM keeps the conversation of this workflow, so
+     * "that submission" refers to the one sent in {@link #inScope}. The returned
+     * {@link Review} becomes part of the workflow state.
+     * <p>
+     * {@code llm.query(REVIEW_PROMPT, Review.class)} would map the reply directly,
+     * but local models like to wrap JSON in markdown fences, which JSON Binding
+     * rejects. So the JSON is cut out of the reply in plain Java first.
+     */
+    @Action
+    Review review(LargeLanguageModel llm) {
+        String reply = llm.query(REVIEW_PROMPT);
+        Review review = JSONB.fromJson(jsonIn(reply), Review.class);
+        LOGGER.info(() -> "[ACTION] score " + review.score() + "/5 - " + review.comment());
+        return review;
+    }
+
+    private static String jsonIn(String reply) {
+        int start = reply.indexOf('{');
+        int end = reply.lastIndexOf('}');
+        return start >= 0 && end > start ? reply.substring(start, end + 1) : reply;
     }
 }

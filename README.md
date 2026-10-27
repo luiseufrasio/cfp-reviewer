@@ -87,6 +87,7 @@ Invoke-RestMethod -Uri http://localhost:8080/api/submissions -Method Post `
 src/main/java/fish/payara/demo/cfp/
 ├── CfpReviewerAgent.java     the @Agent
 ├── RestApplication.java      Jakarta REST under /api
+├── Review.java               the review written by the LLM (record)
 ├── Submission.java           the talk proposal (record)
 ├── SubmissionResource.java   POST / GET /submissions, fires the trigger event
 └── SubmissionStore.java      in-memory store
