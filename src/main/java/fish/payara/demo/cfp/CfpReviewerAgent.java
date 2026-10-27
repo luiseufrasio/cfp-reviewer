@@ -3,12 +3,15 @@ package fish.payara.demo.cfp;
 import jakarta.ai.agent.Action;
 import jakarta.ai.agent.Agent;
 import jakarta.ai.agent.Decision;
+import jakarta.ai.agent.HandleException;
+import jakarta.ai.agent.LLMException;
 import jakarta.ai.agent.LargeLanguageModel;
 import jakarta.ai.agent.Outcome;
 import jakarta.ai.agent.Result;
 import jakarta.ai.agent.Trigger;
 import jakarta.json.bind.Jsonb;
 import jakarta.json.bind.JsonbBuilder;
+import jakarta.json.bind.JsonbException;
 
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -79,14 +82,31 @@ public class CfpReviewerAgent {
      * <p>
      * {@code llm.query(REVIEW_PROMPT, Review.class)} would map the reply directly,
      * but local models like to wrap JSON in markdown fences, which JSON Binding
-     * rejects. So the JSON is cut out of the reply in plain Java first.
+     * rejects. So the JSON is cut out of the reply in plain Java first. A reply
+     * that still is not a review is reported as an {@link LLMException}.
      */
     @Action
     Review review(LargeLanguageModel llm) {
         String reply = llm.query(REVIEW_PROMPT);
-        Review review = JSONB.fromJson(jsonIn(reply), Review.class);
+        Review review;
+        try {
+            review = JSONB.fromJson(jsonIn(reply), Review.class);
+        } catch (JsonbException e) {
+            throw new LLMException("The LLM reply is not a review: " + reply, e);
+        }
         LOGGER.info(() -> "[ACTION] score " + review.score() + "/5 - " + review.comment());
         return review;
+    }
+
+    /**
+     * Called when any phase fails with an {@link LLMException}: the model is
+     * down, times out, or answers something unusable. Returning normally
+     * recovers the workflow, which then closes with {@link #publish}.
+     */
+    @HandleException
+    void llmFailed(LLMException e, Submission submission) {
+        LOGGER.warning(() -> "[EXCEPTION] " + e.getMessage() + " - \"" + submission.title()
+                + "\" goes to a human reviewer");
     }
 
     /**
@@ -94,11 +114,14 @@ public class CfpReviewerAgent {
      * {@link Review} come from the workflow state; {@link SubmissionStore} is
      * not workflow state, so the runtime resolves it as a CDI bean.
      * <p>
-     * Only reached when every decision said yes.
+     * Reached when every decision said yes, or after {@link #llmFailed}
+     * recovered the workflow. In that case no review was produced and
+     * {@code review} is {@code null}.
      */
     @Outcome
     void publish(Submission submission, Review review, SubmissionStore store) {
-        store.saveReview(submission.id(), review);
+        Review published = review != null ? review : Review.forHumanReview();
+        store.saveReview(submission.id(), published);
         LOGGER.info(() -> "[OUTCOME] review published for " + submission.id()
                 + " (\"" + submission.title() + "\")");
     }

@@ -82,6 +82,26 @@ Invoke-RestMethod -Uri http://localhost:8080/api/submissions -Method Post `
   -InFile submissions\strong.json -ContentType application/json
 ```
 
+### When the LLM fails
+
+Stop Ollama and post a submission again: the `@HandleException` method takes
+over, and the review says a person will step in.
+
+```powershell
+Stop-Process -Name "ollama*"      # Windows: or quit Ollama from the tray
+ollama serve                      # start it again afterwards
+```
+
+To simulate the outage without touching Ollama, point the app at a port where
+nothing listens. System properties override `microprofile-config.properties`:
+
+```bash
+mvn clean package
+java -Dpayara.agentic.llm.ollama.base-url=http://localhost:11999 \
+     -jar ~/.m2/repository/fish/payara/extras/payara-micro/7.2026.9/payara-micro-7.2026.9.jar \
+     --deploy target/cfp-reviewer.war --contextroot /
+```
+
 ## Project layout
 
 ```
