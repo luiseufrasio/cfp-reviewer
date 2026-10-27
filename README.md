@@ -72,6 +72,7 @@ curl -s -X POST http://localhost:8080/api/submissions \
 
 curl -s http://localhost:8080/api/submissions
 curl -s http://localhost:8080/api/submissions/{id}
+curl -s http://localhost:8080/api/submissions/{id}/review
 ```
 
 PowerShell:
