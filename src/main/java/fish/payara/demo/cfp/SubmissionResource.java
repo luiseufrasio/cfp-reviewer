@@ -1,6 +1,7 @@
 package fish.payara.demo.cfp;
 
 import jakarta.enterprise.context.RequestScoped;
+import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -19,7 +20,8 @@ import java.util.Collection;
 /**
  * REST entry point of the CFP: speakers POST their submissions here.
  * <p>
- * For now a submission is only stored. Nobody reviews it yet.
+ * Each stored submission is fired as a CDI event, which triggers the
+ * {@link CfpReviewerAgent} workflow.
  */
 @Path("submissions")
 @RequestScoped
@@ -29,10 +31,14 @@ public class SubmissionResource {
     @Inject
     SubmissionStore store;
 
+    @Inject
+    Event<Submission> submitted;
+
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     public Response submit(Submission submission, @Context UriInfo uri) {
         Submission stored = store.add(submission);
+        submitted.fire(stored);   // synchronous: the workflow runs before we respond
         return Response.created(uri.getAbsolutePathBuilder().path(stored.id()).build())
                 .entity(stored)
                 .build();
