@@ -21,7 +21,8 @@ import java.util.Collection;
  * REST entry point of the CFP: speakers POST their submissions here.
  * <p>
  * Each stored submission is fired as a CDI event, which triggers the
- * {@link CfpReviewerAgent} workflow.
+ * {@link CfpReviewerAgent} workflow. The workflow runs synchronously, so the
+ * review is already published when the response is built.
  */
 @Path("submissions")
 @RequestScoped
@@ -39,8 +40,9 @@ public class SubmissionResource {
     public Response submit(Submission submission, @Context UriInfo uri) {
         Submission stored = store.add(submission);
         submitted.fire(stored);   // synchronous: the workflow runs before we respond
+        Review review = store.findReview(stored.id()).orElse(null);   // null: out of scope
         return Response.created(uri.getAbsolutePathBuilder().path(stored.id()).build())
-                .entity(stored)
+                .entity(new ReviewedSubmission(stored, review))
                 .build();
     }
 
@@ -53,5 +55,14 @@ public class SubmissionResource {
     @Path("{id}")
     public Submission get(@PathParam("id") String id) {
         return store.find(id).orElseThrow(NotFoundException::new);
+    }
+
+    @GET
+    @Path("{id}/review")
+    public Review review(@PathParam("id") String id) {
+        return store.findReview(id).orElseThrow(NotFoundException::new);
+    }
+
+    public record ReviewedSubmission(Submission submission, Review review) {
     }
 }

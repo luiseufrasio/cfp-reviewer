@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SubmissionStore {
 
     private final Map<String, Submission> submissions = new ConcurrentHashMap<>();
+    private final Map<String, Review> reviews = new ConcurrentHashMap<>();
 
     public Submission add(Submission submission) {
         Submission stored = submission.withId(UUID.randomUUID().toString().substring(0, 8));
@@ -29,5 +30,13 @@ public class SubmissionStore {
 
     public Collection<Submission> all() {
         return submissions.values();
+    }
+
+    public void saveReview(String submissionId, Review review) {
+        reviews.put(submissionId, review);
+    }
+
+    public Optional<Review> findReview(String submissionId) {
+        return Optional.ofNullable(reviews.get(submissionId));
     }
 }

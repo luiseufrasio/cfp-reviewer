@@ -4,6 +4,7 @@ import jakarta.ai.agent.Action;
 import jakarta.ai.agent.Agent;
 import jakarta.ai.agent.Decision;
 import jakarta.ai.agent.LargeLanguageModel;
+import jakarta.ai.agent.Outcome;
 import jakarta.ai.agent.Result;
 import jakarta.ai.agent.Trigger;
 import jakarta.json.bind.Jsonb;
@@ -86,6 +87,20 @@ public class CfpReviewerAgent {
         Review review = JSONB.fromJson(jsonIn(reply), Review.class);
         LOGGER.info(() -> "[ACTION] score " + review.score() + "/5 - " + review.comment());
         return review;
+    }
+
+    /**
+     * Ends the workflow by publishing the review. {@link Submission} and
+     * {@link Review} come from the workflow state; {@link SubmissionStore} is
+     * not workflow state, so the runtime resolves it as a CDI bean.
+     * <p>
+     * Only reached when every decision said yes.
+     */
+    @Outcome
+    void publish(Submission submission, Review review, SubmissionStore store) {
+        store.saveReview(submission.id(), review);
+        LOGGER.info(() -> "[OUTCOME] review published for " + submission.id()
+                + " (\"" + submission.title() + "\")");
     }
 
     private static String jsonIn(String reply) {

@@ -90,5 +90,5 @@ src/main/java/fish/payara/demo/cfp/
 ├── Review.java               the review written by the LLM (record)
 ├── Submission.java           the talk proposal (record)
 ├── SubmissionResource.java   POST / GET /submissions, fires the trigger event
-└── SubmissionStore.java      in-memory store
+└── SubmissionStore.java      in-memory store for submissions and reviews
 ```
