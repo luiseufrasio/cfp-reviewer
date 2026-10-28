@@ -75,6 +75,10 @@ curl -s http://localhost:8080/api/submissions/{id}
 curl -s http://localhost:8080/api/submissions/{id}/review
 ```
 
+From `6-plain-java` on, the POST answers `202 Accepted` right away, with a
+`Location` header pointing at the review. That URL answers `202` with
+`{"status": "under review"}` while the agent works, then `200` with the review.
+
 PowerShell:
 
 ```powershell
@@ -102,14 +106,40 @@ java -Dpayara.agentic.llm.ollama.base-url=http://localhost:11999 \
      --deploy target/cfp-reviewer.war --contextroot /
 ```
 
+### Tests
+
+The agent is a plain Java class, so its phases are unit-tested by calling them
+directly, with the scripted `LargeLanguageModelStub` from the Jakarta Agentic AI
+TCK in place of a real model. No server, no Ollama:
+
+```bash
+mvn test
+```
+
+## What still ends up in plain Java
+
+Branch `6-plain-java` collects what the specification does not cover (yet):
+
+| Concern | Why it is plain Java |
+|---|---|
+| Telling a rejected speaker why | No phase receives a negative `Result`, not even `@Outcome`, so the `@Decision` publishes the rejection itself |
+| Not blocking the HTTP request | The runtime observes the trigger event synchronously, so `Event.fireAsync` never reaches the agent; `ReviewDispatcher` fires it on a `ManagedExecutorService` |
+| Reading JSON from a local model | Models wrap JSON in markdown fences, so `llm.query(prompt, Review.class)` fails; the JSON is cut out before JSON Binding maps it |
+| A fallback review after a failure | `@HandleException` must return `void`, so the replacement review is chosen in `@Outcome` |
+| Storage | `SubmissionStore` is an in-memory map |
+
 ## Project layout
 
 ```
 src/main/java/fish/payara/demo/cfp/
 ├── CfpReviewerAgent.java     the @Agent
+├── ReviewDispatcher.java     runs the workflow off the HTTP thread
 ├── RestApplication.java      Jakarta REST under /api
 ├── Review.java               the review written by the LLM (record)
 ├── Submission.java           the talk proposal (record)
-├── SubmissionResource.java   POST / GET /submissions, fires the trigger event
+├── SubmissionResource.java   POST / GET /submissions
 └── SubmissionStore.java      in-memory store for submissions and reviews
+
+src/test/java/fish/payara/demo/cfp/
+└── CfpReviewerAgentTest.java the phases, tested with the TCK LLM stub
 ```

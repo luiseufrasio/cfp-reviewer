@@ -63,15 +63,22 @@ public class CfpReviewerAgent {
      * The {@link Submission} comes from the workflow state and the
      * {@link LargeLanguageModel} is supplied by the runtime. The submission is
      * serialized into the {@code {}} placeholder with JSON Binding.
+     * <p>
+     * No later phase sees a negative {@code Result}, not even {@code @Outcome}.
+     * So the rejection is published here, in plain Java, or the speaker would
+     * never learn why.
      */
     @Decision
-    Result inScope(Submission submission, LargeLanguageModel llm) {
+    Result inScope(Submission submission, LargeLanguageModel llm, SubmissionStore store) {
         String answer = llm.query(SCOPE_PROMPT, submission).strip();
         String verdict = answer.lines().findFirst().orElse("");
         String reason = answer.lines().skip(1).collect(Collectors.joining(" ")).strip();
 
         boolean inScope = verdict.toUpperCase().contains("YES");
         LOGGER.info(() -> "[DECISION] in scope: " + inScope + " - " + reason);
+        if (!inScope) {
+            store.saveReview(submission.id(), Review.outOfScope(reason));
+        }
         return new Result(inScope, reason);
     }
 

@@ -1,7 +1,6 @@
 package fish.payara.demo.cfp;
 
 import jakarta.enterprise.context.RequestScoped;
-import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
@@ -20,9 +19,9 @@ import java.util.Collection;
 /**
  * REST entry point of the CFP: speakers POST their submissions here.
  * <p>
- * Each stored submission is fired as a CDI event, which triggers the
- * {@link CfpReviewerAgent} workflow. The workflow runs synchronously, so the
- * review is already published when the response is built.
+ * Reviewing takes tens of seconds with a local model, so the POST only accepts
+ * the submission and hands it to the {@link ReviewDispatcher}. The speaker
+ * polls the review URL until the {@link CfpReviewerAgent} has published it.
  */
 @Path("submissions")
 @RequestScoped
@@ -33,16 +32,15 @@ public class SubmissionResource {
     SubmissionStore store;
 
     @Inject
-    Event<Submission> submitted;
+    ReviewDispatcher dispatcher;
 
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     public Response submit(Submission submission, @Context UriInfo uri) {
         Submission stored = store.add(submission);
-        submitted.fire(stored);   // synchronous: the workflow runs before we respond
-        Review review = store.findReview(stored.id()).orElse(null);   // null: out of scope
-        return Response.created(uri.getAbsolutePathBuilder().path(stored.id()).build())
-                .entity(new ReviewedSubmission(stored, review))
+        dispatcher.dispatch(stored);
+        return Response.accepted(stored)
+                .location(uri.getAbsolutePathBuilder().path(stored.id()).path("review").build())
                 .build();
     }
 
@@ -57,12 +55,19 @@ public class SubmissionResource {
         return store.find(id).orElseThrow(NotFoundException::new);
     }
 
+    /**
+     * 200 with the review once it is published, 202 while the agent is still
+     * working on it, 404 for an unknown submission.
+     */
     @GET
     @Path("{id}/review")
-    public Review review(@PathParam("id") String id) {
-        return store.findReview(id).orElseThrow(NotFoundException::new);
+    public Response review(@PathParam("id") String id) {
+        Submission submission = store.find(id).orElseThrow(NotFoundException::new);
+        return store.findReview(submission.id())
+                .map(review -> Response.ok(review).build())
+                .orElseGet(() -> Response.accepted(new Pending(submission.id(), "under review")).build());
     }
 
-    public record ReviewedSubmission(Submission submission, Review review) {
+    public record Pending(String id, String status) {
     }
 }

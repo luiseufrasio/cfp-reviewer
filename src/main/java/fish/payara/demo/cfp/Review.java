@@ -12,6 +12,12 @@ import java.util.List;
  */
 public record Review(int score, List<String> strengths, List<String> weaknesses, String comment) {
 
+    /** Published when the submission is not a topic for the JUG. */
+    public static Review outOfScope(String reason) {
+        return new Review(1, List.of(), List.of(reason),
+                "Thank you for submitting. This talk is out of scope for our Java User Group: " + reason);
+    }
+
     /** Published when the automatic review failed and a person has to step in. */
     public static Review forHumanReview() {
         return new Review(0, List.of(), List.of(),
